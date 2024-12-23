@@ -51,7 +51,6 @@ else:
 
 from market_proxy import reader
 
-
 HOME: Final = trio.Path(getenv("HOME", path.expanduser("~")))
 XDG_DATA_HOME: Final = trio.Path(
     getenv("XDG_DATA_HOME", HOME / ".local" / "share"),
@@ -223,9 +222,9 @@ async def handle_root(script: str) -> Response:
     script_title = script.removesuffix(".php")
 
     record = "&".join(f"{k}={data[k]}" for k in sorted(data))
-    record_bin = record.encode('utf-8')
+    record_bin = record.encode("utf-8")
 
-    script_record = DATA_PATH / f'{script_title}.bi'
+    script_record = DATA_PATH / f"{script_title}.bi"
 
     if not await script_record.exists():
         async with await script_record.open("wb") as afp:
@@ -237,7 +236,7 @@ async def handle_root(script: str) -> Response:
                 if item.name == record_bin:
                     return item.content
 
-    print(f'{record = }')
+    print(f"{record = }")
     url = f"{HOST}/{script}"
 
     headers = {
@@ -257,7 +256,7 @@ async def handle_root(script: str) -> Response:
         await afp.write(field.to_stream())
     return result
     return record
- 
+
 
 try:
     import market_api

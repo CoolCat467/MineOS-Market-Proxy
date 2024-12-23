@@ -67,7 +67,7 @@ class IntegerField(NamedTuple):
         fill = b" ".join(
             (self.type_bytes, self.name, str(self.value).encode("ascii")),
         )
-        return b":" + fill + b'\n'
+        return b":" + fill + b"\n"
 
 
 class BlobField(NamedTuple):
@@ -98,7 +98,7 @@ class BlobField(NamedTuple):
                 str(len(self.content)).encode("ascii"),
             ),
         )
-        return b":" + fill + b"\n" + self.content + b'\n'
+        return b":" + fill + b"\n" + self.content + b"\n"
 
 
 Field: TypeAlias = IntegerField | BlobField
@@ -160,7 +160,7 @@ class BiReader(NamedTuple):
 
     def read_stream(self) -> Generator[Field, None, None]:
         """Yield fields or raise ValueError."""
-        field_types = Field.__args__  # type: ignore[attr-defined]
+        field_types = Field.__args__
         field_map = {
             field_type.type_bytes: field_type for field_type in field_types
         }

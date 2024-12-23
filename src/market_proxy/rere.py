@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2024 Alexey Kutepov <reximkut@gmail.com>
 
+"""Rere - Save snapshots of program outputs."""
+
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including
@@ -27,6 +29,7 @@ from typing import BinaryIO
 
 
 def read_blob_field(f: BinaryIO, name: bytes) -> bytes:
+    """Read and return blob field from file."""
     line = f.readline()
     field = b":b " + name + b" "
     assert line.startswith(field), field
@@ -38,6 +41,7 @@ def read_blob_field(f: BinaryIO, name: bytes) -> bytes:
 
 
 def read_int_field(f: BinaryIO, name: bytes) -> int:
+    """Read and return integer field from file."""
     line = f.readline()
     field = b":i " + name + b" "
     assert line.startswith(field)
@@ -46,16 +50,19 @@ def read_int_field(f: BinaryIO, name: bytes) -> int:
 
 
 def write_int_field(f: BinaryIO, name: bytes, value: int) -> None:
+    """Write integer field to file."""
     f.write(b":i %s %d\n" % (name, value))
 
 
 def write_blob_field(f: BinaryIO, name: bytes, blob: bytes) -> None:
+    """Write blob field to file."""
     f.write(b":b %s %d\n" % (name, len(blob)))
     f.write(blob)
     f.write(b"\n")
 
 
 def capture(shell: str) -> dict:
+    """Capture and return shell script output."""
     print(f"CAPTURING: {shell}")
     process = subprocess.run(["sh", "-c", shell], capture_output=True)
     return {
@@ -67,11 +74,13 @@ def capture(shell: str) -> dict:
 
 
 def load_list(file_path: str) -> list[str]:
+    """Load file lines."""
     with open(file_path) as f:
         return [line.strip() for line in f]
 
 
-def dump_snapshots(file_path: str, snapshots: list[dict]):
+def dump_snapshots(file_path: str, snapshots: list[dict]) -> None:
+    """Write snapshots to file."""
     with open(file_path, "wb") as f:
         write_int_field(f, b"count", len(snapshots))
         for snapshot in snapshots:
@@ -82,6 +91,7 @@ def dump_snapshots(file_path: str, snapshots: list[dict]):
 
 
 def load_snapshots(file_path: str) -> list[dict]:
+    """Load and return snapshots from file path."""
     snapshots = []
     with open(file_path, "rb") as f:
         count = read_int_field(f, b"count")
@@ -162,11 +172,16 @@ if __name__ == "__main__":
                 b = process.stdout.splitlines(keepends=True)
                 print("UNEXPECTED: stdout")
                 for line in diff_bytes(
-                    unified_diff, a, b, fromfile=b"expected", tofile=b"actual",
+                    unified_diff,
+                    a,
+                    b,
+                    fromfile=b"expected",
+                    tofile=b"actual",
                 ):
                     # See https://docs.python.org/3/library/codecs.html#error-handlers
                     print(
-                        line.decode("utf-8", errors="backslashreplace"), end="",
+                        line.decode("utf-8", errors="backslashreplace"),
+                        end="",
                     )
                 failed = True
             if process.stderr != snapshot["stderr"]:
@@ -174,10 +189,15 @@ if __name__ == "__main__":
                 b = process.stderr.splitlines(keepends=True)
                 print("UNEXPECTED: stderr")
                 for line in diff_bytes(
-                    unified_diff, a, b, fromfile=b"expected", tofile=b"actual",
+                    unified_diff,
+                    a,
+                    b,
+                    fromfile=b"expected",
+                    tofile=b"actual",
                 ):
                     print(
-                        line.decode("utf-8", errors="backslashreplace"), end="",
+                        line.decode("utf-8", errors="backslashreplace"),
+                        end="",
                     )
                 failed = True
             if failed:
