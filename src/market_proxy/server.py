@@ -1,6 +1,6 @@
 """Market Proxy - MineOS App Market Proxy Server.
 
-Copyright (C) 2024  CoolCat467
+Copyright (C) 2024-2025  CoolCat467
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ import traceback
 from collections import ChainMap
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from os import getenv, makedirs, path
-from typing import Any, Final, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Final, TypeVar, cast
 
 import httpx
 import trio
@@ -51,6 +51,11 @@ else:
 
 from market_proxy import reader
 
+if TYPE_CHECKING:
+    from typing_extensions import ParamSpec
+
+    PS = ParamSpec("PS")
+
 HOME: Final = trio.Path(getenv("HOME", path.expanduser("~")))
 XDG_DATA_HOME: Final = trio.Path(
     getenv("XDG_DATA_HOME", HOME / ".local" / "share"),
@@ -64,11 +69,11 @@ MAIN_CONFIG: Final = CONFIG_PATH / "config.toml"
 
 HOST: Final = "http://mineos.buttex.ru/MineOSAPI/2.04"
 
-Handler = TypeVar("Handler", bound=Callable[..., Awaitable[object]])
-
 AGENT: Final = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.119 Safari/537.36"
 )
+
+T = TypeVar("T")
 
 
 def combine_end(data: Iterable[str], final: str = "and") -> str:
@@ -99,11 +104,13 @@ async def get_exception_page(
     code: int,
     name: str,
     desc: str,
+    return_link: str | None = None,
 ) -> tuple[AsyncIterator[str], int]:
     """Return Response for exception."""
     resp_body = await send_error(
         page_title=f"{code} {name}",
         error_body=desc,
+        return_link=return_link,
     )
     return (resp_body, code)
 
@@ -127,11 +134,16 @@ def pretty_exception_name(exc: BaseException) -> str:
     return f"{error} ({reason})"
 
 
-def pretty_exception(function: Handler) -> Handler:
+def pretty_exception(
+    function: Callable[PS, Awaitable[T]],
+) -> Callable[PS, Awaitable[T | tuple[AsyncIterator[str], int]]]:
     """Make exception pages pretty."""
 
     @functools.wraps(function)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+    async def wrapper(  # type: ignore[misc]
+        *args: PS.args,
+        **kwargs: PS.kwargs,
+    ) -> T | tuple[AsyncIterator[str], int]:
         code = 500
         name = "Exception"
         desc = (
@@ -143,11 +155,7 @@ def pretty_exception(function: Handler) -> Handler:
         try:
             return await function(*args, **kwargs)
         except Exception as exception:
-            ### traceback.print_exception changed in 3.10
-            ##if sys.version_info < (3, 10):
-            ##    tb = sys.exc_info()[2]
-            ##    traceback.print_exception(etype=None, value=exception, tb=tb)
-            ##else:
+            # traceback.print_exception changed in 3.10
             traceback.print_exception(exception)
 
             if isinstance(exception, HTTPException):
@@ -164,7 +172,7 @@ def pretty_exception(function: Handler) -> Handler:
             desc,
         )
 
-    return cast(Handler, wrapper)
+    return wrapper
 
 
 # Stolen from WOOF (Web Offer One File), Copyright (C) 2004-2009 Simon Budig,
@@ -205,7 +213,7 @@ app: Final = QuartTrio(  # pylint: disable=invalid-name
 
 
 @pretty_exception
-@app.route("/MineOSAPI/2.04/<script>", methods=("POST", "GET"))  # type: ignore[type-var]
+@app.route("/MineOSAPI/2.04/<script>", methods=("POST", "GET"))  # type: ignore[misc]
 async def handle_root(script: str) -> Response:
     """Send root file."""
     client = app.config["HTTPX_CLIENT"]
@@ -230,10 +238,13 @@ async def handle_root(script: str) -> Response:
         async with await script_record.open("wb") as afp:
             await afp.aclose()
 
-    with open(script_record, "rb") as fp:
+    with open(script_record, "rb") as fp:  # noqa: ASYNC230
         with reader.BiReader(fp) as bi_reader:
             for item in bi_reader:
-                if item.name == record_bin:
+                if (
+                    isinstance(item, reader.BlobField)
+                    and item.name == record_bin
+                ):
                     return item.content
 
     print(f"{record = }")
@@ -255,7 +266,6 @@ async def handle_root(script: str) -> Response:
     async with await script_record.open("ab") as afp:
         await afp.write(field.to_stream())
     return result
-    return record
 
 
 try:
@@ -263,7 +273,10 @@ try:
 
     def pretty_format(text: str) -> str:
         """Pretty format text."""
-        obj = cast(dict[str, Any], market_api.lua_parser.parse_lua_table(text))
+        obj = cast(
+            "dict[str, Any]",
+            market_api.lua_parser.parse_lua_table(text),
+        )
         value = market_api.pretty_format_response(obj)
         assert isinstance(value, str)
         return value
@@ -357,7 +370,7 @@ def server_market(
             config["bind"] = bound
 
             secure_locations = combine_end(
-                f"http://{addr}" for addr in sorted(bound)
+                f"https://{addr}" for addr in sorted(bound)
             )
             print(f"Serving on {secure_locations} securely")
 
@@ -428,9 +441,14 @@ use_reloader = false
 
     hypercorn: dict[str, object] = config.get("hypercorn", {})
 
+    ip_address: str | None = None
+    if "--local" in sys.argv[1:]:
+        ip_address = "127.0.0.1"
+
     server_market(
         secure_bind_port=secure_bind_port,
         insecure_bind_port=insecure_bind_port,
+        ip_addr=ip_address,
         hypercorn=hypercorn,
     )
 

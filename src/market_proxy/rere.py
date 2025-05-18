@@ -25,7 +25,7 @@
 import subprocess
 import sys
 from difflib import diff_bytes, unified_diff
-from typing import BinaryIO
+from typing import BinaryIO, NamedTuple
 
 
 def read_blob_field(f: BinaryIO, name: bytes) -> bytes:
@@ -61,16 +61,28 @@ def write_blob_field(f: BinaryIO, name: bytes, blob: bytes) -> None:
     f.write(b"\n")
 
 
-def capture(shell: str) -> dict:
+class Snapshot(NamedTuple):
+    """Shell script snapshot."""
+
+    shell: bytes
+    returncode: int
+    stdout: bytes
+    stderr: bytes
+
+
+def capture(shell: str) -> Snapshot:
     """Capture and return shell script output."""
     print(f"CAPTURING: {shell}")
-    process = subprocess.run(["sh", "-c", shell], capture_output=True)
-    return {
-        "shell": shell,
-        "returncode": process.returncode,
-        "stdout": process.stdout,
-        "stderr": process.stderr,
-    }
+    process = subprocess.run(  # noqa: S603
+        ["sh", "-c", shell],  # noqa: S607
+        capture_output=True,
+    )
+    return Snapshot(
+        shell.encode("utf-8"),
+        process.returncode,
+        process.stdout,
+        process.stderr,
+    )
 
 
 def load_list(file_path: str) -> list[str]:
@@ -79,34 +91,31 @@ def load_list(file_path: str) -> list[str]:
         return [line.strip() for line in f]
 
 
-def dump_snapshots(file_path: str, snapshots: list[dict]) -> None:
+def dump_snapshots(file_path: str, snapshots: list[Snapshot]) -> None:
     """Write snapshots to file."""
     with open(file_path, "wb") as f:
         write_int_field(f, b"count", len(snapshots))
         for snapshot in snapshots:
-            write_blob_field(f, b"shell", bytes(snapshot["shell"], "utf-8"))
-            write_int_field(f, b"returncode", snapshot["returncode"])
-            write_blob_field(f, b"stdout", snapshot["stdout"])
-            write_blob_field(f, b"stderr", snapshot["stderr"])
+            write_blob_field(f, b"shell", snapshot.shell)
+            write_int_field(f, b"returncode", snapshot.returncode)
+            write_blob_field(f, b"stdout", snapshot.stdout)
+            write_blob_field(f, b"stderr", snapshot.stderr)
 
 
-def load_snapshots(file_path: str) -> list[dict]:
+def load_snapshots(file_path: str) -> list[Snapshot]:
     """Load and return snapshots from file path."""
     snapshots = []
     with open(file_path, "rb") as f:
         count = read_int_field(f, b"count")
         for _ in range(count):
-            shell = read_blob_field(f, b"shell")
-            returncode = read_int_field(f, b"returncode")
-            stdout = read_blob_field(f, b"stdout")
-            stderr = read_blob_field(f, b"stderr")
-            snapshot = {
-                "shell": shell,
-                "returncode": returncode,
-                "stdout": stdout,
-                "stderr": stderr,
-            }
-            snapshots.append(snapshot)
+            snapshots.append(
+                Snapshot(
+                    read_blob_field(f, b"shell"),
+                    read_int_field(f, b"returncode"),
+                    read_blob_field(f, b"stdout"),
+                    read_blob_field(f, b"stderr"),
+                ),
+            )
     return snapshots
 
 
@@ -151,7 +160,7 @@ if __name__ == "__main__":
 
         for shell, snapshot in zip(shells, snapshots, strict=False):
             print(f"REPLAYING: {shell}")
-            snapshot_shell = snapshot["shell"].decode("utf-8")
+            snapshot_shell = snapshot.shell.decode("utf-8")
             if shell != snapshot_shell:
                 print("UNEXPECTED: shell command")
                 print(f"    EXPECTED: {snapshot_shell}")
@@ -160,15 +169,19 @@ if __name__ == "__main__":
                     f"NOTE: You may want to do `{program_name} record {test_list_path}` to update {test_list_path}.bi",
                 )
                 exit(1)
-            process = subprocess.run(["sh", "-c", shell], capture_output=True)
+            process = subprocess.run(  # noqa: S603
+                ["sh", "-c", shell],  # noqa: S607
+                capture_output=True,
+            )
             failed = False
-            if process.returncode != snapshot["returncode"]:
+            if process.returncode != snapshot.returncode:
                 print("UNEXPECTED: return code")
-                print(f"    EXPECTED: {snapshot['returncode']}")
+                print(f"    EXPECTED: {snapshot.returncode!r}")
                 print(f"    ACTUAL:   {process.returncode}")
                 failed = True
-            if process.stdout != snapshot["stdout"]:
-                a = snapshot["stdout"].splitlines(keepends=True)
+            if process.stdout != snapshot.stdout:
+                stdout_bytes = snapshot.stdout
+                a = stdout_bytes.splitlines(keepends=True)
                 b = process.stdout.splitlines(keepends=True)
                 print("UNEXPECTED: stdout")
                 for line in diff_bytes(
@@ -184,8 +197,9 @@ if __name__ == "__main__":
                         end="",
                     )
                 failed = True
-            if process.stderr != snapshot["stderr"]:
-                a = snapshot["stderr"].splitlines(keepends=True)
+            if process.stderr != snapshot.stderr:
+                stderr_bytes = snapshot.stderr
+                a = stderr_bytes.splitlines(keepends=True)
                 b = process.stderr.splitlines(keepends=True)
                 print("UNEXPECTED: stderr")
                 for line in diff_bytes(

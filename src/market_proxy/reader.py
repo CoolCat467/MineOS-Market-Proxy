@@ -8,7 +8,7 @@ See https://github.com/tsoding/bi-format for more details.
 from __future__ import annotations
 
 # Bi-Reader - Tsoding bi format reader.
-# Copyright (C) 2024  CoolCat467
+# Copyright (C) 2024-2025  CoolCat467
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -31,7 +31,9 @@ __license__ = "GNU General Public License Version 3"
 
 from io import BytesIO
 from typing import (
+    IO,
     TYPE_CHECKING,
+    ClassVar,
     NamedTuple,
     NoReturn,
     TypeAlias,
@@ -52,10 +54,14 @@ class IntegerField(NamedTuple):
     name: bytes
     value: int
 
-    type_bytes = b"i"
+    type_bytes: ClassVar = b"i"  # type: ignore[valid-type]
 
     @classmethod
-    def from_reader(cls, name: bytes, reader: BiReader) -> Self:
+    def from_reader(  # type: ignore[misc]
+        cls: type[Self],
+        name: bytes,
+        reader: BiReader,
+    ) -> Self:
         """Return instance of this class from stream and name."""
         value_result = reader.read_until(b"\n")
         if not value_result:
@@ -76,10 +82,14 @@ class BlobField(NamedTuple):
     name: bytes
     content: bytes
 
-    type_bytes = b"b"
+    type_bytes: ClassVar = b"b"  # type: ignore[valid-type]
 
     @classmethod
-    def from_reader(cls, name: bytes, reader: BiReader) -> Self:
+    def from_reader(  # type: ignore[misc]
+        cls: type[Self],
+        name: bytes,
+        reader: BiReader,
+    ) -> Self:
         """Return instance of this class from stream and name."""
         size_result = reader.read_until(b"\n")
         if not size_result:
@@ -104,20 +114,20 @@ class BlobField(NamedTuple):
 Field: TypeAlias = IntegerField | BlobField
 
 
-def combine_end(data: Iterable[str], final: str = "and") -> str:
+def combine_end(data: Iterable[object], final: str = "and") -> str:
     """Join values of text, and have final with the last one properly."""
-    data = list(map(str, data))
-    if len(data) >= 2:
-        data[-1] = f"{final} {data[-1]}"
-    if len(data) > 2:
-        return ", ".join(data)
-    return " ".join(data)
+    as_list = list(map(str, data))
+    if len(as_list) >= 2:
+        as_list[-1] = f"{final} {as_list[-1]}"
+    if len(as_list) > 2:
+        return ", ".join(as_list)
+    return " ".join(as_list)
 
 
 class BiReader(NamedTuple):
     """Bi Format Reader."""
 
-    stream: BytesIO
+    stream: IO[bytes]
 
     def read(self, count: int) -> bytes:
         """Return count bytes read from stream."""
@@ -161,7 +171,7 @@ class BiReader(NamedTuple):
     def read_stream(self) -> Generator[Field, None, None]:
         """Yield fields or raise ValueError."""
         field_types = Field.__args__
-        field_map = {
+        field_map: dict[bytes, Field] = {
             field_type.type_bytes: field_type for field_type in field_types
         }
         while self.stream.readable():
