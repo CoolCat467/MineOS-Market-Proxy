@@ -38,7 +38,7 @@ import httpx
 import trio
 from hypercorn.config import Config
 from hypercorn.trio import serve
-from quart import Response, request
+from quart import request
 from quart.templating import stream_template
 from quart_trio import QuartTrio
 from werkzeug.exceptions import HTTPException
@@ -213,8 +213,8 @@ app: Final = QuartTrio(  # pylint: disable=invalid-name
 
 
 @pretty_exception
-@app.route("/MineOSAPI/2.04/<script>", methods=("POST", "GET"))  # type: ignore[misc]
-async def handle_root(script: str) -> Response:
+@app.route("/MineOSAPI/2.04/<script>", methods=("POST", "GET"))
+async def handle_root(script: str) -> bytes:
     """Send root file."""
     client = app.config["HTTPX_CLIENT"]
 
@@ -238,6 +238,11 @@ async def handle_root(script: str) -> Response:
         async with await script_record.open("wb") as afp:
             await afp.aclose()
 
+    current_time = int(time.time())
+    timestamp = current_time
+    # Ignore if older than 1 day
+    decay_time = 1 * 60 * 60 * 24
+    # TODO: Delete expired records
     with open(script_record, "rb") as fp:  # noqa: ASYNC230
         with reader.BiReader(fp) as bi_reader:
             for item in bi_reader:
@@ -245,7 +250,16 @@ async def handle_root(script: str) -> Response:
                     isinstance(item, reader.BlobField)
                     and item.name == record_bin
                 ):
+                    age = current_time - timestamp
+                    if age > decay_time:
+                        print(f"{script_record} - Exists but {age = }")
+                        continue
                     return item.content
+                if (
+                    isinstance(item, reader.IntegerField)
+                    and item.name == b"timestamp"
+                ):
+                    timestamp = item.value
 
     print(f"{record = }")
     url = f"{HOST}/{script}"
@@ -260,11 +274,16 @@ async def handle_root(script: str) -> Response:
     else:
         response = await client.post(url=url, data=data, headers=headers)
     result = await response.aread()
+    assert isinstance(result, bytes)
 
-    field = reader.BlobField(record_bin, result)
+    timestamp_field = reader.IntegerField(b"timestamp", int(time.time()))
+    blob = reader.BlobField(record_bin, result)
 
     async with await script_record.open("ab") as afp:
-        await afp.write(field.to_stream())
+        # Write timestamp before field
+        # TODO: Delete expired records
+        await afp.write(timestamp_field.to_stream())
+        await afp.write(blob.to_stream())
     return result
 
 
