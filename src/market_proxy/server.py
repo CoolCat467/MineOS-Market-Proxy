@@ -28,6 +28,7 @@ import functools
 import socket
 import sys
 import time
+import tomllib
 import traceback
 from collections import ChainMap
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
@@ -42,12 +43,6 @@ from quart import request
 from quart.templating import stream_template
 from quart_trio import QuartTrio
 from werkzeug.exceptions import HTTPException
-
-if sys.version_info < (3, 11):
-    import tomli as tomllib
-    from exceptiongroup import BaseExceptionGroup
-else:
-    import tomllib
 
 from market_proxy import reader
 

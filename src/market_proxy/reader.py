@@ -45,8 +45,7 @@ from market_proxy.result import Result
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Iterator
     from types import TracebackType
-
-    from typing_extensions import Self
+    from typing import Self
 
 F = TypeVar("F", bound="type[Field]")
 
