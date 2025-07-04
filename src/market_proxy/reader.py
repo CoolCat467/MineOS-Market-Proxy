@@ -238,7 +238,7 @@ class BiReader(NamedTuple):
         return
 
 
-def run() -> None:
+def run() -> None:  # pragma: nocover
     """Run program."""
     data = b""":i count 3
 :b hello 12
