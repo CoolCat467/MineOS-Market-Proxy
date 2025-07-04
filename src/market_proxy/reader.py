@@ -33,31 +33,53 @@ from io import BytesIO
 from typing import (
     IO,
     TYPE_CHECKING,
-    ClassVar,
+    Final,
     NamedTuple,
     NoReturn,
     TypeAlias,
+    TypeVar,
 )
 
 from market_proxy.result import Result
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Iterator
+    from collections.abc import Callable, Generator, Iterable, Iterator
     from types import TracebackType
 
     from typing_extensions import Self
 
+F = TypeVar("F", bound="type[Field]")
 
+
+FIELD_TYPES: Final[dict[bytes, type[Field]]] = {}
+
+
+def register_type(identifier: bytes) -> Callable[[F], F]:
+    """Register field type."""
+
+    def register_type_class_decorator(cls: F) -> F:
+        assert identifier not in FIELD_TYPES
+        FIELD_TYPES[identifier] = cls
+        return cls
+
+    return register_type_class_decorator
+
+
+def type_bytes(instance: Field) -> bytes:
+    """Return type bytes for field instance."""
+    reverse = {v: k for k, v in FIELD_TYPES.items()}
+    return reverse[type(instance)]
+
+
+@register_type(b"i")
 class IntegerField(NamedTuple):
     """Integer Field Object."""
 
     name: bytes
     value: int
 
-    type_bytes: ClassVar = b"i"  # type: ignore[valid-type]
-
     @classmethod
-    def from_reader(  # type: ignore[misc]
+    def from_reader(
         cls: type[Self],
         name: bytes,
         reader: BiReader,
@@ -71,21 +93,20 @@ class IntegerField(NamedTuple):
     def to_stream(self) -> bytes:
         """Serialize this object to bytes for writing to stream."""
         fill = b" ".join(
-            (self.type_bytes, self.name, str(self.value).encode("ascii")),
+            (type_bytes(self), self.name, str(self.value).encode("ascii")),
         )
         return b":" + fill + b"\n"
 
 
+@register_type(b"b")
 class BlobField(NamedTuple):
     """Binary Blob Field Object."""
 
     name: bytes
     content: bytes
 
-    type_bytes: ClassVar = b"b"  # type: ignore[valid-type]
-
     @classmethod
-    def from_reader(  # type: ignore[misc]
+    def from_reader(
         cls: type[Self],
         name: bytes,
         reader: BiReader,
@@ -103,7 +124,7 @@ class BlobField(NamedTuple):
         """Serialize this object to bytes for writing to stream."""
         fill = b" ".join(
             (
-                self.type_bytes,
+                type_bytes(self),
                 self.name,
                 str(len(self.content)).encode("ascii"),
             ),
@@ -114,6 +135,11 @@ class BlobField(NamedTuple):
 Field: TypeAlias = IntegerField | BlobField
 
 
+def unhandled_types() -> set[type]:
+    """Return set of types registered with `register_type` but missing from Field union."""
+    return set(FIELD_TYPES.values()) - set(Field.__args__)
+
+
 def combine_end(data: Iterable[object], final: str = "and") -> str:
     """Join values of text, and have final with the last one properly."""
     as_list = list(map(str, data))
@@ -122,6 +148,11 @@ def combine_end(data: Iterable[object], final: str = "and") -> str:
     if len(as_list) > 2:
         return ", ".join(as_list)
     return " ".join(as_list)
+
+
+assert (
+    not unhandled_types()
+), f"Registered type(s) missing from `Field` alias: {combine_end(unhandled_types())}"
 
 
 class BiReader(NamedTuple):
@@ -140,7 +171,10 @@ class BiReader(NamedTuple):
 
     def fail(self, text: str) -> NoReturn:
         """Raise ValueError."""
-        raise ValueError(text)
+        extra = ""
+        if hasattr(self.stream, "name"):
+            extra = f" while reading from {self.stream.name!r}"
+        raise ValueError(f"{text}{extra}")
 
     def expect_fail(self, chars: bytes) -> bytes:
         """Return bytes that match chars or fail."""
@@ -170,10 +204,6 @@ class BiReader(NamedTuple):
 
     def read_stream(self) -> Generator[Field, None, None]:
         """Yield fields or raise ValueError."""
-        field_types = Field.__args__
-        field_map: dict[bytes, Field] = {
-            field_type.type_bytes: field_type for field_type in field_types
-        }
         while self.stream.readable():
             start_result = self.expect(b":")
             if not start_result:
@@ -182,10 +212,10 @@ class BiReader(NamedTuple):
                 got = start_result.unwrap().decode("utf-8")
                 self.fail(f"Expected b':', but got {got}")
             field_type_header = self.read(1)
-            field_type = field_map.get(field_type_header)
+            field_type = FIELD_TYPES.get(field_type_header)
             if field_type is None:
                 self.fail(
-                    f"Expected {combine_end(field_map, 'or')}, but got {field_type_header.decode('utf-8')}",
+                    f"Expected {combine_end(FIELD_TYPES, 'or')}, but got {field_type_header.decode('utf-8')!r}",
                 )
             self.expect_fail(b" ")
             name = self.read_name()
