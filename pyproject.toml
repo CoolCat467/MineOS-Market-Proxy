@@ -161,6 +161,9 @@ source_pkgs = ["market_proxy"]
 omit = [
     "generate_pages.py",
 ]
+parallel = true
+relative_files = true
+source = ["."]
 
 [tool.coverage.report]
 precision = 1
@@ -184,34 +187,3 @@ partial_branches = [
     "if .* or not _t.TYPE_CHECKING:",
     "if .* or not t.TYPE_CHECKING:",
 ]
-
-[tool.tox]
-legacy_tox_ini = """
-    [tox]
-    envlist = py310, py311, py312, mypy, pytest
-    isolated_build = false
-
-    [gh-actions]
-    python =
-        3.10: py310, pytest, mypy
-        3.11: py311, pytest
-        3.12: py312, pytest, mypy
-
-    [testenv]
-    setenv =
-        PYTHONPATH = {toxinidir}
-
-    [testenv:pytest]
-    deps =
-        pytest
-        pytest-cov
-        pytest-trio
-    commands = pytest --basetemp={envtmpdir}
-
-    [testenv:mypy]
-    deps =
-        mypy
-        pytest
-        pytest-trio
-    commands = mypy src tests
-"""
