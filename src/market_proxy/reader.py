@@ -25,7 +25,7 @@ from __future__ import annotations
 
 __title__ = "Bi-Reader"
 __author__ = "CoolCat467"
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 __license__ = "GNU General Public License Version 3"
 
 
@@ -253,8 +253,7 @@ You can have new lines in here.
 You can actually store binary data in here.
 You can nest another bi file in here, thus
 making the format Tree-like.
-"""
-    data = b""":b Person/json 69
+:b Person/json 69
 {
     "Name": "John Doe",
     "Age": 69,
