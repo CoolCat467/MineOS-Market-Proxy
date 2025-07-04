@@ -150,9 +150,9 @@ def combine_end(data: Iterable[object], final: str = "and") -> str:
     return " ".join(as_list)
 
 
-assert (
-    not unhandled_types()
-), f"Registered type(s) missing from `Field` alias: {combine_end(unhandled_types())}"
+assert not unhandled_types(), (
+    f"Registered type(s) missing from `Field` alias: {combine_end(unhandled_types())}"
+)
 
 
 class BiReader(NamedTuple):

@@ -69,9 +69,7 @@ MAIN_CONFIG: Final = CONFIG_PATH / "config.toml"
 
 HOST: Final = "http://mineos.buttex.ru/MineOSAPI/2.04"
 
-AGENT: Final = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.119 Safari/537.36"
-)
+AGENT: Final = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.119 Safari/537.36"
 
 T = TypeVar("T")
 
