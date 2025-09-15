@@ -32,7 +32,7 @@ dependencies = [
     "hypercorn[trio]~=0.17.3",
     "quart~=0.20.0",
     "quart-trio~=0.12.0",
-    "trio~=0.30.0",
+    "trio~=0.31.0",
     "Werkzeug~=3.1.3",
 ]
 
