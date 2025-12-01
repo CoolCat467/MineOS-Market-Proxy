@@ -23,7 +23,7 @@ pip install git+https://github.com/CoolCat467/MineOS-Market-Proxy.git
 
 ## Usage
 ```bash
-mineos_market_proxy
+mineos_market_proxy [--local]
 ```
 
 ## Technical details
