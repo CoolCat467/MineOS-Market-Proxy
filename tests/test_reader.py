@@ -150,7 +150,7 @@ def test_read_stream_unknown_type_raises() -> None:
     # craft ":z name\n" where 'z' is unregistered
     data = b":z foo\n"
     reader = make_reader(data)
-    with pytest.raises(ValueError, match="Expected .* but got 'z'"):
+    with pytest.raises(ValueError, match=r"Expected .* but got 'z'"):
         list(reader)
 
 
