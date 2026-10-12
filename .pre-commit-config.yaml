@@ -24,7 +24,7 @@ repos:
       - id: ruff-format
       - id: ruff-check
         types: [file]
-        types_or: [python, pyi, toml]
+        types_or: [python, pyi]
   - repo: https://github.com/CoolCat467/badgie
     rev: v0.9.6
     hooks:
