@@ -28,7 +28,7 @@ classifiers = [
 ]
 keywords = ["minecraft", "mineos", "api", "server"]
 dependencies = [
-    "httpx2~=2.13.1",
+    "httpx2>=2.13.1,<2.15.0",
     "hypercorn[trio]~=0.18.0",
     "quart>=0.20.0",
     "quart-trio>=0.12.0",
